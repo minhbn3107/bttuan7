@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="index.css" />
+    </head>
+    <body>
+        <div class="content">
+            <form
+                id="create"
+                method="POST"
+                action="/"
+                enctype="multipart/form-data"
+            >
+                <input type="text" name="ma_sp" placeholder="Mã sản phẩm" />
+                <input type="text" name="ten_sp" placeholder="Tên sản phẩm" />
+                <input
+                    type="number"
+                    name="so_luong"
+                    placeholder="Số lượng sản phẩm"
+                />
+                <input type="file" name="image" id="" />
+                <input type="submit" value="Submit" />
+            </form>
+            <form id="delete" method="POST" action="/delete">
+                <div class="title">
+                    Danh sách sản phẩm<button type="submit">Xóa</button>
+                </div>
+                <table border="1">
+                    <tr>
+                        <th>Mã SP</th>
+                        <th>Tên SP</th>
+                        <th>Số Lượng</th>
+                        <th>Hình ảnh</th>
+                        <th>Chọn</th>
+                    </tr>
+                    <% for (let i = 0; i < sanPhams.length; i++) { %>
+                    <tr>
+                        <td><%= sanPhams[i].ma_sp.S %></td>
+                        <td><%= sanPhams[i].ten_sp.S %></td>
+                        <td><%= sanPhams[i].so_luong.S %></td>
+                        <td>
+                            <img
+                                width="50px"
+                                src="<%= sanPhams[i].image_url.S %>"
+                                alt=""
+                            />
+                        </td>
+                        <td>
+                            <input
+                                type="checkbox"
+                                name="ma_sp"
+                                value="<%= sanPhams[i].ma_sp.S %>"
+                            />
+                        </td>
+                    </tr>
+                    <% } %>
+                </table>
+            </form>
+        </div>
+    </body>
+</html>

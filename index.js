@@ -19,11 +19,11 @@ AWS.config.update({
 });
 
 const s3 = new AWS.S3();
-
-const dynamoDb = new AWS.DynamoDB();
 const docClient = new AWS.DynamoDB.DocumentClient();
 
 const TableName = "Sanpham";
+const BucketName = "uploads3tutorialbucket1";
+const CLOUD_FRONT_URL = "https://d3l2l6ry2s34fe.cloudfront.net/";
 
 const multer = require("multer");
 
@@ -35,7 +35,6 @@ const storage = multer.memoryStorage({
 
 function checkFileType(file, cb) {
     const fileTypes = /jpeg|jpg|png|gif/;
-
     const extname = fileTypes.test(
         path.extname(file.originalname).toLowerCase()
     );
@@ -43,7 +42,6 @@ function checkFileType(file, cb) {
     if (extname && mimetype) {
         return cb(null, true);
     }
-
     return cb("Error: Image Only");
 }
 
@@ -53,42 +51,40 @@ const upload = multer({
     fileFilter(req, file, cb) {
         checkFileType(file, cb);
     },
-}).single("image");
+});
 
-const CLOUD_FRONT_URL = "https://d3l2l6ry2s34fe.cloudfront.net/";
+function getS3KeyFromUrl(url) {
+    return url.replace(CLOUD_FRONT_URL, "");
+}
 
 app.get("/", (req, res) => {
     try {
-        dynamoDb.scan(
-            {
-                TableName,
-            },
-            (err, data) => {
-                if (err) res.send(err.message);
+        docClient.scan({ TableName }, (err, data) => {
+            if (err) res.send(err.message);
 
-                res.render("index", {
-                    sanPhams: data.Items,
-                });
-            }
-        );
+            res.render("index", { items: data.Items });
+        });
     } catch (error) {
         res.send(error);
     }
 });
 
-app.post("/", upload, (req, res) => {
+app.post("/", upload.single("image"), (req, res) => {
     if (!req.file) {
         return res.status(400).send("No file uploaded.");
     }
 
     const { ma_sp, ten_sp, so_luong } = req.body;
     const image = req.file.originalname.split(".");
-
     const fileType = image[image.length - 1];
-
     const filePath = `${uuid() + Date.now().toString()}.${fileType}`;
+
+    if (!so_luong || isNaN(so_luong) || parseInt(so_luong) <= 0) {
+        return res.status(400).send("Số lượng phải là số lớn hơn 0");
+    }
+
     const params = {
-        Bucket: "uploads3tutorialbucket1",
+        Bucket: BucketName,
         Key: filePath,
         Body: req.file.buffer,
     };
@@ -119,24 +115,98 @@ app.post("/", upload, (req, res) => {
     });
 });
 
-app.post("/delete", (req, res) => {
-    try {
-        const { ma_sp } = req.body;
+app.get("/edit/:ma_sp", (req, res) => {
+    const { ma_sp } = req.params;
 
-        docClient.delete(
-            {
+    const params = {
+        TableName,
+        Key: {
+            ma_sp,
+        },
+    };
+
+    docClient.get(params, (err, data) => {
+        if (err) {
+            return res.send("Internal Server Error");
+        }
+        if (!data.Item) {
+            return res.status(404).send("Product not found");
+        }
+
+        res.render("edit", { product: data.Item });
+    });
+});
+
+app.post("/edit/:ma_sp", (req, res) => {
+    const { ma_sp } = req.params;
+    const { ten_sp, so_luong } = req.body;
+
+    if (!so_luong || isNaN(so_luong) || parseInt(so_luong) <= 0) {
+        return res.status(400).send("Số lượng phải là số lớn hơn 0");
+    }
+
+    const updateParams = {
+        TableName,
+        Key: {
+            ma_sp,
+        },
+        UpdateExpression: "set ten_sp = :t, so_luong = :s",
+        ExpressionAttributeValues: {
+            ":t": ten_sp,
+            ":s": so_luong,
+        },
+        ReturnValues: "UPDATED_NEW",
+    };
+
+    docClient.update(updateParams, (err, data) => {
+        if (err) {
+            console.error("Error updating product:", err);
+            return res.send("Internal Server Error");
+        }
+        res.redirect("/");
+    });
+});
+
+app.post("/delete", async (req, res) => {
+    const { ma_sp } = req.body;
+    if (!ma_sp) {
+        return res.redirect("/");
+    }
+
+    const idsToDelete = Array.isArray(ma_sp) ? ma_sp : [ma_sp];
+
+    try {
+        for (const id of idsToDelete) {
+            const getParams = {
                 TableName,
                 Key: {
-                    ma_sp,
+                    ma_sp: id,
                 },
-            },
-            (err, data) => {
-                if (err) res.send("error");
-                res.redirect("/");
+            };
+
+            const { Item } = await docClient.get(getParams).promise();
+
+            if (Item && Item.image_url) {
+                const imageKey = getS3KeyFromUrl(Item.image_url);
+                const s3Params = {
+                    Bucket: BucketName,
+                    Key: imageKey,
+                };
+                await s3.deleteObject(s3Params).promise();
             }
-        );
-    } catch (error) {
-        res.send("error");
+
+            const deleteParams = {
+                TableName,
+                Key: {
+                    ma_sp: id,
+                },
+            };
+            await docClient.delete(deleteParams).promise();
+        }
+        res.redirect("/");
+    } catch (err) {
+        console.error("Error during deletion:", err);
+        res.status(500).send("Internal Server Error");
     }
 });
 

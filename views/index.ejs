@@ -19,6 +19,9 @@
                     type="number"
                     name="so_luong"
                     placeholder="Số lượng sản phẩm"
+                    oninvalid="this.setCustomValidity('Vui lòng nhập số lượng lớn hơn 0')"
+                    oninput="this.setCustomValidity('')"
+                    min="1"
                 />
                 <input type="file" name="image" id="" />
                 <input type="submit" value="Submit" />
@@ -34,16 +37,17 @@
                         <th>Số Lượng</th>
                         <th>Hình ảnh</th>
                         <th>Chọn</th>
+                        <th>Sửa</th>
                     </tr>
-                    <% for (let i = 0; i < sanPhams.length; i++) { %>
+                    <% for (let i = 0; i < items.length; i++) { %>
                     <tr>
-                        <td><%= sanPhams[i].ma_sp.S %></td>
-                        <td><%= sanPhams[i].ten_sp.S %></td>
-                        <td><%= sanPhams[i].so_luong.S %></td>
+                        <td><%= items[i].ma_sp %></td>
+                        <td><%= items[i].ten_sp %></td>
+                        <td><%= items[i].so_luong %></td>
                         <td>
                             <img
                                 width="50px"
-                                src="<%= sanPhams[i].image_url.S %>"
+                                src="<%= items[i].image_url %>"
                                 alt=""
                             />
                         </td>
@@ -51,8 +55,11 @@
                             <input
                                 type="checkbox"
                                 name="ma_sp"
-                                value="<%= sanPhams[i].ma_sp.S %>"
+                                value="<%= items[i].ma_sp %>"
                             />
+                        </td>
+                        <td>
+                            <a href="/edit/<%= items[i].ma_sp %>">Edit</a>
                         </td>
                     </tr>
                     <% } %>
